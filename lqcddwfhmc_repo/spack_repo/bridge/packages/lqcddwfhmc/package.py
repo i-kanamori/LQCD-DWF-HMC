@@ -32,6 +32,7 @@ class Lqcddwfhmc(MakefilePackage):
 
     depends_on('mpi', when='+mpi')
     depends_on('fftw@3:', when='+fftw')
+    depends_on('fftw+mpi', when='+fftw+mpi')
     depends_on('doxygen', when='+doxygen')
 
     # OpenACC accelerator code requires the NVIDIA HPC SDK compiler (restrict keyword, OpenACC pragmas)
@@ -42,11 +43,15 @@ class Lqcddwfhmc(MakefilePackage):
         filter = FileFilter(makefile)
         
         # Modify existing variables in Makefile: r"^\s* means newline and any leading spaces
-        filter.filter(r'^\s*use_mpi =.*', 'use_mpi = {0}'.format('yes' if '+mpi' in spec else 'no'))
+        if ('^fujitsu-mpi' in spec and '+mpi' in spec):
+            filter.filter(r'^\s*use_mpi =.*', 'use_mpi = fjmpi')
+        else:
+            filter.filter(r'^\s*use_mpi =.*', 'use_mpi = {0}'.format('yes' if '+mpi' in spec else 'no'))
         filter.filter(r'^\s*use_thread =.*', 'use_thread = {0}'.format('omp' if '+openmp' in spec else 'no'))
         filter.filter(r'^\s*use_opt_code =.*', 'use_opt_code = {0}'.format('yes' if '+opt' in spec else 'no'))
         filter.filter(r'^\s*use_gauge_group =.*', 'use_gauge_group = {0}'.format(spec.variants['gauge_group'].value))
         filter.filter(r'^\s*use_testmanager =.*', 'use_testmanager = {0}'.format('yes' if '+testmanager' in spec else 'no'))
+        filter.filter(r'^\s*use_fftw_library =.*', 'use_fftw_library = {0}'.format('yes' if '+fftw' in spec else 'no'))
         filter.filter(r'^\s*use_fftw =.*', 'use_fftw = {0}'.format('yes' if '+fftw' in spec else 'no'))
         filter.filter(r'^\s*fftw_library_path =.*', 'fftw_library_path = {0}'.format(spec['fftw'].prefix if '+fftw' in spec else ''))
         filter.filter(r'^\s*use_alternative =.*', 'use_alternative = yes')
@@ -68,6 +73,11 @@ class Lqcddwfhmc(MakefilePackage):
             'PC_NVIDIA' if spec["cxx"].name == "nvhpc" else
             'PC_GNU'  # default
         ))     #TODO 've' is not really a thing...
+
+        makefile_target = join_path(self.stage.source_path, 'Makefile_target.inc')
+        filter = FileFilter(makefile_target)
+        if '+mpi' in spec:
+            filter.filter('CXX =.*', 'CXX = {0}'.format(spec['mpi'].mpicxx))
 
     def build(self, spec, prefix):
         make()
